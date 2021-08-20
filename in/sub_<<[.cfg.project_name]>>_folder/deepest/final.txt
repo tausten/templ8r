@@ -1,0 +1,2 @@
+Contents of a file under a folder below a parent who's name was parameterized.
+The contents in here should also be processed and substitute for [<<[ .cfg.project_name ]>>]

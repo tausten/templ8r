@@ -1,0 +1,1 @@
+Both contents and filename have replacements for [<<[.cfg.project_name]>>]
