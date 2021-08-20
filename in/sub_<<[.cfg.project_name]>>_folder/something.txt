@@ -1,0 +1,2 @@
+Do some [<<[.cfg.project_name]>>] replacement... and do we need 
+spages between begin/end delims and the inner stuff??

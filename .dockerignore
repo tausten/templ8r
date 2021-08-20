@@ -1,0 +1,10 @@
+.devcontainer/
+.github/
+.vscode/
+tmp/
+.editorconfig
+.gitignore
+.gitattributes
+Dockerfile
+Makefile
+README.md

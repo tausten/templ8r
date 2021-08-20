@@ -1,0 +1,89 @@
+#!/bin/sh
+
+# basic error hard-stoppage
+set -e
+DBL_SL="//"
+SNG_SL="/"
+
+# input variables to the script / docker app
+echo Preparing input variables / args...
+IN_DIR=${IN_DIR:-"$(pwd)/in"}
+IN_DIR=${IN_DIR/${DBL_SL}/${SNG_SL}}
+OUT_DIR=${OUT_DIR:-"$(pwd)/out"}
+OUT_DIR=${OUT_DIR/${DBL_SL}/${SNG_SL}}
+CFG_FILE=${CFG_FILE:-"$(pwd)/cfg.env"}
+CFG_FILE=${CFG_FILE/${DBL_SL}/${SNG_SL}}
+LEFT_DELIM=${LEFT_DELIM:-"<<["}
+RIGHT_DELIM=${RIGHT_DELIM:-"]>>"}
+
+echo IN_DIR=${IN_DIR}
+echo OUT_DIR=${OUT_DIR}
+echo CFG_FILE=${CFG_FILE}
+echo LEFT_DELIM=${LEFT_DELIM}
+echo RIGHT_DELIM=${RIGHT_DELIM}
+echo
+
+# working variables
+echo Preparing working variables...
+IN_DIR_NAME=$(basename ${IN_DIR})
+OUT_DIR_NAME=$(basename ${OUT_DIR})
+
+WORKING_FOLDER_NAME=.tmp
+WORKING_FOLDER=${WORKING_FOLDER:-"$(pwd)/${WORKING_FOLDER_NAME}"}
+WORKING_FOLDER=${WORKING_FOLDER/${DBL_SL}/${SNG_SL}}
+echo WORKING_FOLDER=${WORKING_FOLDER}
+
+IN_FILE_PREFIX="${WORKING_FOLDER}/${IN_DIR_NAME}"
+IN_FOLDERS_FILE="${IN_FILE_PREFIX}_folders.txt"
+IN_FILES_FILE="${IN_FILE_PREFIX}_files.txt"
+
+INTERMEDIATE_FOLDER_NAME="${IN_DIR_NAME}.tmp"
+INTERMEDIATE_FOLDER="${WORKING_FOLDER}/${INTERMEDIATE_FOLDER_NAME}"
+INTERMEDIATE_FILE_PREFIX="${IN_FILE_PREFIX}_tmp"
+INTERMEDIATE_FOLDERS_FILE="${INTERMEDIATE_FILE_PREFIX}_folders.txt"
+INTERMEDIATE_FILES_FILE="${INTERMEDIATE_FILE_PREFIX}_files.txt"
+echo INTERMEDIATE_FOLDER=${INTERMEDIATE_FOLDER}
+
+GOMPLATE_OPT_DELIMS="--left-delim=\"${LEFT_DELIM}\" --right-delim=\"${RIGHT_DELIM}\""
+GOMPLATE_OPT_CFG="-c cfg=${CFG_FILE}"
+GOMPLATE_CMD="gomplate ${GOMPLATE_OPT_DELIMS} ${GOMPLATE_OPT_CFG}"
+echo GOMPLATE_CMD=${GOMPLATE_CMD}
+
+SED_PATTERN_IN_TO_TMP="s/\/${IN_DIR_NAME}/\/${WORKING_FOLDER_NAME}\/${INTERMEDIATE_FOLDER_NAME}/"
+echo SED_PATTERN_IN_TO_TMP=${SED_PATTERN_IN_TO_TMP}
+
+echo
+
+echo Input configuration is:
+echo --- BEGIN ${CFG_FILE} 
+cat ${CFG_FILE}
+echo --- END - ${CFG_FILE} 
+
+echo
+
+# create our working folder
+echo Creating ${WORKING_FOLDER}...
+mkdir -p ${WORKING_FOLDER}
+
+# prep folders first
+echo preparing input folder name to template-expanded target folder name mappings...
+find "${IN_DIR}" -type d -exec echo '"{}"' \; > ${IN_FOLDERS_FILE}
+eval ${GOMPLATE_CMD} -f=${IN_FOLDERS_FILE} | sed "${SED_PATTERN_IN_TO_TMP}" > ${INTERMEDIATE_FOLDERS_FILE}
+cat ${INTERMEDIATE_FOLDERS_FILE} | xargs mkdir -p
+
+# get input and intermediate files lists
+echo preparing input file name to template-expanded target file name mappings...
+find "${IN_DIR}" -type f -exec echo '"{}"' \; > ${IN_FILES_FILE}
+eval ${GOMPLATE_CMD} -f=${IN_FILES_FILE} | sed "${SED_PATTERN_IN_TO_TMP}" > ${INTERMEDIATE_FILES_FILE}
+
+# symlink the sources to their new names in the temp folder structure
+echo Symlinking sources to intermediate targets...
+paste -d " " ${IN_FILES_FILE} ${INTERMEDIATE_FILES_FILE} | xargs -n 2 ln -s
+
+# now run gomplate with indir, excludes, and outdir
+echo Running gomplate against the intermediate folder structure...
+eval ${GOMPLATE_CMD} --input-dir=${INTERMEDIATE_FOLDER} --output-dir=${OUT_DIR}
+
+# cleanup tmp files
+echo Cleaning up ${WORKING_FOLDER}...
+rm -rf ${WORKING_FOLDER}
